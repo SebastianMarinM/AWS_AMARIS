@@ -1,43 +1,46 @@
-# Technical Documentation: Energy Trading Data Lake
+# Documentación Técnica: Data Lake Comercialización de Energía
 
-## Overview
-This document explains the key components, flow, and configurations of the energy trading data lake project built on AWS using CloudFormation as Infrastructure as Code (IaC).
+## 🧩 Descripción General
+Este documento describe la arquitectura y componentes implementados en AWS para construir un Data Lake orientado a una comercializadora de energía. Se utilizó CloudFormation como IaC para el despliegue de la infraestructura.
 
-## Glue Jobs
-- Each ETL script transforms raw CSV data into Parquet format partitioned by date.
-- Jobs are orchestrated individually and can be triggered via schedule or event.
-- The first job (`raw-to-processed`) validates and formats raw data.
-- The second job (`processed-to-curated`) aggregates and enriches data for analytics.
+---
 
-## Data Catalog
-- Managed using AWS Glue Crawlers to keep schema updated automatically.
-- Crawlers scan raw and processed data and register the schema in the Glue Data Catalog.
+## ⚙️ Glue Jobs
+- Cada script ETL transforma archivos CSV en formato Parquet y los almacena particionados por fecha (`year/month/day`).
+- Los Glue Jobs fueron configurados con triggers automáticos desde S3.
+- `raw-to-processed`: Limpieza de columnas, tipos de datos, particionado y cambio de formato.
+- `processed-to-curated`: Enriquecimiento y validación de datos.
 
-## CloudFormation Modules
-- `s3`: Defines buckets for raw, processed, and curated data with necessary IAM policies.
-- `glue`: Provisions Glue Jobs, Crawlers, IAM Roles, and Glue Databases.
-- `lakeformation`: Sets up centralized governance, data sharing, and access controls.
-- `athena`: Creates Athena Workgroups and output configurations.
-- `redshift`: Provisions Redshift cluster, IAM roles, and schemas for analytics layer.
+---
 
-## Athena
-- Used for ad hoc queries and business analysis.
-- Connected via Python scripts using Boto3 to execute SQL over processed data in S3.
+## 🧾 Catálogo de Datos (Glue Data Catalog)
+- Gestionado mediante Crawlers de Glue.
+- Crawlers programados o manuales detectan esquemas en las zonas `raw`, `processed` y `curated`.
+- Bases de datos separadas para cada capa (`energy_trading_raw_db`, `..._processed_db`, `..._curated_db`).
 
-## Redshift
-- The curated data is loaded into Amazon Redshift from S3 using COPY commands.
-- Data is available in structured format for BI tools and analytics teams.
-- Integration enabled through Redshift IAM roles and access to curated zone.
-- Schema Example:
-  - `analytics.providers`
-  - `analytics.clients`
-  - `analytics.transactions`
+---
 
-## Security & Governance
-- IAM roles and policies are provisioned per principle of least privilege.
-- Buckets encrypted with SSE-KMS.
-- TLS used for data in transit.
-- Audit enabled using CloudTrail, S3 access logs, and Lake Formation logging.
+## 🏗️ Infraestructura CloudFormation
+- `s3`: Buckets versionados para cada capa (`raw`, `processed`, `curated`).
+- `glue`: Bases de datos, Crawlers, Jobs, Roles.
+- `lakeformation`: Registro de ubicaciones, permisos y control de acceso.
+- `athena`: Workgroups y ubicación de resultados en S3.
+- `redshift`: Redshift Serverless, rol IAM y esquema externo con Glue Catalog.
 
-## Summary
-This project sets up a full-scale analytical environment using AWS-native services and CloudFormation. It provides structured ingestion, transformation, cataloging, and querying, and supports downstream Redshift data warehousing for deeper analytics.
+---
+
+## 🔍 Athena
+- Consultas SQL ejecutadas directamente sobre los datos curados en S3.
+- Integración opcional mediante script Python usando `boto3` y `AthenaClient`.
+
+---
+
+## 📊 Redshift (Spectrum)
+- Redshift Serverless configurado para consultar directamente datos en S3 (sin copiar).
+- Esquema externo creado con:
+  ```sql
+  CREATE EXTERNAL SCHEMA curated
+  FROM data catalog
+  DATABASE 'energy_trading_dev_db'
+  IAM_ROLE 'arn:aws:iam::<account_id>:role/AmazonRedshift-CommandsAccessRole-...'
+  CREATE EXTERNAL DATABASE IF NOT EXISTS;
