@@ -131,6 +131,23 @@ Validaciones aplicadas en scripts de transformación:
   - Se inició el proceso para conectar el repositorio de **GitHub con AWS** con el objetivo de automatizar despliegues directamente desde el código fuente.  
   Aunque la integración no se completó, se documentó la intención y se dejó preparado el entorno para su futura implementación como una mejora de CI/CD.
 
+
+  ## 🧪 Carpeta `experimental/` (antes `src/`)
+
+Durante el desarrollo del proyecto, se creó una carpeta con el nombre original `src/` que contenía scripts, transformaciones y utilidades desarrolladas como parte del proceso exploratorio y técnico.
+
+Esta carpeta fue renombrada como `experimental/` para reflejar su propósito real: agrupar componentes que **no fueron utilizados directamente en el pipeline desplegado con CloudFormation**, pero que sirvieron para:
+
+- Probar transformaciones modulares por dataset (`transform_customers.py`, `transform_providers.py`, etc.).
+- Generar datos de ejemplo (`generate_sample_data.py`).
+- Explorar consultas y vistas SQL (`analysis_queries.sql`, `create_views.sql`).
+- Crear utilidades reusables para fechas, logs y S3 (`utils/`).
+
+Debido a que el pipeline final fue **validado directamente en AWS como infraestructura desplegada por CloudFormation**, estos componentes **no fueron necesarios en la ejecución oficial**, pero reflejan el análisis previo y el soporte técnico realizado durante el desarrollo del proyecto.
+
+Se decidió conservar esta carpeta para documentar el proceso completo y mantener trazabilidad del trabajo exploratorio realizado.
+
+
 ## 📄 Licencia
 Licencia MIT
 
