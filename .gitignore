@@ -53,13 +53,25 @@ temp/
 
 # Pytest
 .pytest_cache/
+test/output/
 
 # Data
 data/raw/*
 !data/raw/providers/sample_providers.csv
 !data/raw/clients/sample_clients.csv
 !data/raw/transactions/sample_transactions.csv
+data/processed/
+data/curated/
 *.parquet
 
-# Init files
-!**/__init__.py
+# Docs
+docs/*.pdf
+docs/*.html
+
+# Notebooks
+*.ipynb
+
+
+# Misc
+get-pip.py
+

@@ -2,7 +2,7 @@
 # ⚡ Proyecto Data Lake para Comercialización de Energía
 
 ## 📌 Descripción General
-Este proyecto implementa una arquitectura completa de Data Lake para una empresa comercializadora de energía utilizando AWS. Se ingieren archivos CSV desde sistemas operativos (clientes, proveedores, transacciones), se procesan con AWS Glue, se almacenan en S3 en múltiples zonas, se consultan mediante Athena y Redshift Spectrum, y se aplica gobernanza de datos con Lake Formation.
+Este proyecto implementa una arquitectura completa de Data Lake para una empresa comercializadora de energía utilizando AWS. Se ingieren archivos CSV desde sistemas operativos (clientes, proveedores, transacciones), se procesan con AWS Glue, se almacenan en S3 en múltiples zonas, se consultan mediante Athena y Redshift, y se aplica gobernanza de datos con Lake Formation.
 
 ## 📐 Arquitectura
 El pipeline sigue una arquitectura en capas:
@@ -13,7 +13,7 @@ El pipeline sigue una arquitectura en capas:
 - **Acceso Analítico**:
   - **Amazon Athena**: Consultas SQL directas sobre datos en S3.
   - **Amazon Redshift Spectrum**: Consultas externas sobre datos curados vía Glue Catalog.
-  
+
 ## 🛠 Tecnologías Utilizadas
 - `Amazon S3`: Almacenamiento del Data Lake
 - `AWS Glue`: ETL (Jobs + Crawlers + Catálogo)
@@ -27,51 +27,50 @@ El pipeline sigue una arquitectura en capas:
 ```
 AWS_AMARIS/
 ├── data/
-│ ├── raw/ # Archivos CSV originales
-│ ├── processed/ # Datos Parquet transformados
-│ └── curated/ # Datos listos para análisis
-├── docs/ # Documentación y diagramas
-│ ├── ARCHITECTURE.md
-│ ├── QUICKSTART.md
-│ └── technical_documentation.md
-├── experimental/ # Scripts no usados en el pipeline final
-│ ├── config/
-│ ├── etl/
-│ ├── scripts/
-│ └── sql/
+│   ├── raw/
+│   ├── processed/
+│   └── curated/
+├── docs/
+│   ├── ARCHITECTURE.md
+│   ├── QUICKSTART.md
+│   └── technical_documentation.md
+├── experimental/
+│   ├── config/
+│   ├── etl/
+│   ├── scripts/
+│   └── sql/
 ├── infrastructure/
-│ ├── modules/ # Plantillas CloudFormation por servicio
-│ └── environments/dev/ # Stack principal
+│   ├── modules/
+│   └── environments/dev/
 ├── scripts/
-│ └── python/ # ETL oficial validado en AWS
-│ ├── raw_to_processed.py
-│ ├── processed_to_curated.py
-│ └── athena_queries.py
-├── test/ # Scripts de prueba y validación
+│   └── python/
+│       ├── raw_to_processed.py
+│       ├── processed_to_curated.py
+│       └── athena_queries.py
+├── test/
 ├── README.md
 └── requirements.txt
+```
 
+## 📦 Instalación de dependencias
+
+Antes de ejecutar los scripts, asegúrate de instalar las librerías necesarias con:
+
+```bash
+pip install -r requirements.txt
 ```
 
 ## 🚀 Guía de Despliegue
 
 ### Paso 1: Desplegar Infraestructura
 ```bash
-# Buckets S3
 aws cloudformation deploy --template-file infrastructure/cloudformation/modules/s3.yaml --stack-name datalake-s3
-
-# Lake Formation y permisos
 aws cloudformation deploy --template-file infrastructure/cloudformation/modules/lakeformation.yaml --stack-name datalake-lakeformation
-
-# Recursos de Glue (jobs, crawlers, roles)
 aws cloudformation deploy --template-file infrastructure/cloudformation/modules/glue.yaml --stack-name datalake-glue
-
-# Clúster Redshift
 aws cloudformation deploy --template-file infrastructure/cloudformation/modules/redshift.yaml --stack-name datalake-redshift
 ```
 
 ### Paso 2: Ejecutar ETL Jobs
-Puedes ejecutarlos desde la consola de AWS o mediante trigger:
 - `raw_to_processed.py`: Convierte CSV a Parquet y particiona por fecha.
 - `processed_to_curated.py`: Limpia, deduplica y escribe datos curados.
 
@@ -86,7 +85,7 @@ Usa el script `athena_queries.py` para:
 - Obtener los principales clientes por consumo
 - Evaluar desempeño de proveedores
 
-### Paso 5: Redshift Spectrum 
+### Paso 5: Redshift Spectrum
 ```sql
 CREATE EXTERNAL SCHEMA curated
 FROM data catalog
@@ -94,7 +93,6 @@ DATABASE 'energy_trading_curated_db'
 IAM_ROLE 'arn:aws:iam::ACCOUNT_ID:role/RedshiftSpectrumRole'
 CREATE EXTERNAL DATABASE IF NOT EXISTS;
 
--- Consulta de ejemplo
 SELECT * FROM curated.clients LIMIT 10;
 ```
 
@@ -119,23 +117,27 @@ Validaciones aplicadas en scripts de transformación:
 - Deduplicación por campos clave
 - Creación y verificación de particiones en S3
 
+## 🔍 Pruebas Unitarias
+El proyecto incluye una carpeta `test/` que agrupa pruebas automatizadas diseñadas como soporte adicional para validar funcionalidades críticas del pipeline:
+
+- `test_athena_queries.py`: Simula la ejecución de una consulta en Athena usando `boto3` con mocks.
+- `test_data_validation.py`: Prueba la validación de esquemas en DataFrames.
+- `test_etl_jobs.py`: Valida una transformación básica con Spark.
+- `conftest.py`: Define fixtures reutilizables.
+
+> Nota: Se eliminó `test_utils.py` por no aportar validación funcional real.
+
 ## 📷 Validación, Evidencias y Mejoras Pendientes
+- El pipeline fue probado completamente en AWS.
+- La infraestructura fue desplegada exitosamente con CloudFormation.
+- Se validaron Glue Jobs, consultas Athena y Redshift Spectrum.
+- Se adjuntan capturas de evidencia en el documento entregado.
 
-- Todo el pipeline fue probado completamente en AWS.  
-- La infraestructura fue desplegada exitosamente usando plantillas de **AWS CloudFormation**, incluyendo módulos para S3, Glue, Lake Formation y Redshift.
-- Se validó que cada componente se ejecutara correctamente:
-  - Glue Jobs completaron con éxito.
-  - Athena ejecutó consultas sobre particiones correctamente.
-  - Redshift Spectrum pudo consultar datos desde la zona `curated`.
-- Se adjuntan imágenes de las ejecuciones en AWS Console en el documento entregado.
-- 
-- **Mejoras pendientes**:
-  - Agregar control de duplicados en las zonas raw/processed.
-  - Optimizar validaciones de calidad de datos.
-  - Automatizar ejecución de pruebas unitarias para los ETL scripts.
-  - Se inició el proceso para conectar el repositorio de **GitHub con AWS** con el objetivo de automatizar despliegues directamente desde el código fuente.  
-  Aunque la integración no se completó, se documentó la intención y se dejó preparado el entorno para su futura implementación como una mejora de CI/CD.
-
+**Mejoras pendientes**:
+- Control de duplicados en zona raw/processed.
+- Validaciones más robustas.
+- Automatizar pruebas unitarias.
+- Integración CI/CD entre GitHub y AWS (entorno preparado, aún no conectado).
 
   ## 🧪 Carpeta `experimental/` (antes `src/`)
 
@@ -152,7 +154,5 @@ Debido a que el pipeline final fue **validado directamente en AWS como infraestr
 
 Se decidió conservar esta carpeta para documentar el proceso completo y mantener trazabilidad del trabajo exploratorio realizado.
 
-
 ## 📄 Licencia
 Licencia MIT
-
