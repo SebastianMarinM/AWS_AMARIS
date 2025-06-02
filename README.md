@@ -26,25 +26,30 @@ El pipeline sigue una arquitectura en capas:
 ## 📁 Estructura del Proyecto
 ```
 AWS_AMARIS/
-├── infrastructure/
-│   ├── modules/
-│   │   ├── s3.yaml
-│   │   ├── glue.yaml
-│   │   ├── lakeformation.yaml
-│   │   └── redshift.yaml
-│   └── environments/
-│       └── dev/
-│           └── cloudformation_stack.yaml
-├── scripts/
-│   └── python/
-│       ├── raw_to_processed.py
-│       ├── processed_to_curated.py
-│       └── athena_queries.py
 ├── data/
-│   ├── raw/
-│   ├── processed/
-│   └── curated/
-└── README.md
+│ ├── raw/ # Archivos CSV originales
+│ ├── processed/ # Datos Parquet transformados
+│ └── curated/ # Datos listos para análisis
+├── docs/ # Documentación y diagramas
+│ ├── ARCHITECTURE.md
+│ ├── QUICKSTART.md
+│ └── technical_documentation.md
+├── experimental/ # Scripts no usados en el pipeline final
+│ ├── config/
+│ ├── etl/
+│ ├── scripts/
+│ └── sql/
+├── infrastructure/
+│ ├── modules/ # Plantillas CloudFormation por servicio
+│ └── environments/dev/ # Stack principal
+├── scripts/
+│ └── python/ # ETL oficial validado en AWS
+│ ├── raw_to_processed.py
+│ ├── processed_to_curated.py
+│ └── athena_queries.py
+├── test/ # Scripts de prueba y validación
+├── README.md
+└── requirements.txt
 
 ```
 
