@@ -3,6 +3,8 @@
 ## Descripción General
 Este documento describe la arquitectura completa del sistema de Data Lake implementado para la comercializadora de energía, incluyendo todos los componentes, flujos de datos, recursos desplegados con CloudFormation y consideraciones de seguridad.
 
+![Arquitectura](./diagrams/architecture.png)
+
 ## Componentes Principales
 
 ### 1. Capa de Almacenamiento (S3)
@@ -13,82 +15,51 @@ Este documento describe la arquitectura completa del sistema de Data Lake implem
   ```
   s3://energy-trading-datalake-dev/raw/
   ├── providers/
-  │   └── 20250529_providers/
   ├── clients/
-  │   └── 20250529_clients/
   └── transactions/
-      └── 20250529_transactions/
   ```
 - **Retención**: 90 días
 
 #### Processed Zone (Silver)
 - **Propósito**: Almacena datos transformados y validados en formato Parquet.
-- **Estructura**:
-  ```
-  s3://energy-trading-datalake-dev/processed/
-  ├── providers/
-  │   └── 20250529_providers/
-  ├── clients/
-  │   └── 20250529_clients/
-  └── transactions/
-      └── 20250529_transactions/
-  ```
 - **Optimizaciones**:
   - Compresión Snappy
-  - Particionamiento por fecha
+  - Particionamiento por fecha (año/mes/día)
 
 #### Curated Zone (Gold)
 - **Propósito**: Datos agregados para análisis.
-- **Estructura**:
-  ```
-  s3://energy-trading-datalake-dev/curated/
-  ├── daily_energy_consumption/20250529/
-  ├── provider_performance/20250529/
-  └── client_analytics/20250529/
-  ```
 - **Formato**: Parquet optimizado para Athena
 
 ### 2. Procesamiento de Datos
 
 #### AWS Glue
 
-- **Crawlers** (definidos en CloudFormation con `AWS::Glue::Crawler`):
-  - `raw-data-crawler`: Detecta esquemas de datos crudos
-  - `processed-data-crawler`: Detecta esquemas en zona transformada
+- **Crawlers**:
+  - `raw-data-crawler`: Detecta esquemas en zona raw
+  - `processed-data-crawler`: Detecta esquemas en zona processed
 
-- **Jobs ETL** (definidos con `AWS::Glue::Job`):
-  1. `raw-to-processed`:
-     - Lee CSV de zona raw
-     - Aplica limpieza y normalización
-     - Convierte a Parquet
-     - Escribe en zona processed
-  2. `processed-to-curated`:
-     - Agrega datos
-     - Calcula KPIs
-     - Optimiza para consultas
-  3. `curated-to-redshift`:
-     - Extrae datos agregados desde la zona curated
-     - Realiza carga incremental hacia Amazon Redshift
-     - Usa conexión JDBC configurada mediante Glue Connection
+- **Jobs ETL**:
+  1. `raw-to-processed`: Limpieza básica, conversión a Parquet, particionado
+  2. `processed-to-curated`: Agregación y KPIs
+  3. `curated-to-redshift` : Carga incremental a Redshift
 
 #### Lake Formation
 - Catálogo centralizado
-- Permisos a través de `AWS::LakeFormation::Permissions`
+- Permisos gestionados con `LakeFormation::Permissions`
 
 ### 3. Análisis y Consulta
 
-#### Athena (definido con `AWS::Athena::WorkGroup`)
+#### Athena
 - Workgroups: `analysts`, `reporting`, `data-science`
-- Consultas automáticas vía script Python con `boto3`
+- Consultas vía script Python con `boto3`
 
 #### Amazon Redshift
-- Destino final del pipeline
-- Carga desde zona curated usando Glue Job y conexión JDBC
-- Glue Connection: definida con `AWS::Glue::Connection` en CloudFormation
+- Carga desde zona curated
+- Conexión JDBC definida en CloudFormation
 
 ### 4. Seguridad y Monitoreo
 
-- IAM Roles mínimos y con políticas gestionadas (CloudFormation `AWS::IAM::Role`)
+- IAM Roles mínimos necesarios
 - S3 cifrado con SSE-KMS
 - TLS en tránsito
 - Logs activados:
@@ -98,21 +69,21 @@ Este documento describe la arquitectura completa del sistema de Data Lake implem
 
 ## Infraestructura como Código
 
-Todo el entorno se despliega con CloudFormation en YAML:
-- Buckets S3 (`AWS::S3::Bucket`)
+Todo el entorno se despliega con CloudFormation:
+- Buckets S3
 - Glue Crawlers y Jobs
-- Bases de datos Glue (`AWS::Glue::Database`)
-- Workgroups y databases Athena
-- Roles IAM y políticas
-- Lake Formation Permissions
-- Glue Connection JDBC
-- Opcional: Redshift Cluster (`AWS::Redshift::Cluster`)
+- Bases de datos Glue
+- Workgroups de Athena
+- Roles IAM
+- Lake Formation
+- Conexión JDBC
+- Redshift (opcional)
 
 ## Pipeline de Datos (Resumen)
 
-1. Sistema transaccional exporta CSV → S3 (raw)
-2. Crawler detecta esquema y lo registra en Glue Data Catalog
-3. Job `raw-to-processed` limpia y transforma los datos a Parquet
-4. Job `processed-to-curated` agrega y optimiza
+1. Sistema transaccional exporta CSV → S3
+2. Crawler detecta esquema y lo registra
+3. Glue Job `raw-to-processed` transforma
+4. Glue Job `processed-to-curated` agrega y optimiza
 5. Crawler actualiza Catálogo
-6. Consultas desde Athena y carga a Redshift (`curated-to-redshift`)
+6. Athena consulta y Redshift carga final
