@@ -118,26 +118,34 @@ Validaciones aplicadas en scripts de transformación:
 - Creación y verificación de particiones en S3
 
 ## 🔍 Pruebas Unitarias
-El proyecto incluye una carpeta `test/` que agrupa pruebas automatizadas diseñadas como soporte adicional para validar funcionalidades críticas del pipeline:
 
-- `test_athena_queries.py`: Simula la ejecución de una consulta en Athena usando `boto3` con mocks.
-- `test_data_validation.py`: Prueba la validación de esquemas en DataFrames.
-- `test_etl_jobs.py`: Valida una transformación básica con Spark.
-- `conftest.py`: Define fixtures reutilizables.
+El proyecto incluye una carpeta test/ que agrupa pruebas automatizadas diseñadas como soporte adicional para validar funcionalidades críticas del pipeline:
 
-> Nota: Se eliminó `test_utils.py` por no aportar validación funcional real.
+- test_athena_queries.py: Simula la ejecución de una consulta en Athena usando boto3 con mocks, validando el flujo completo sin depender de la nube.
+- test_data_validation.py: Prueba la validación de esquemas en DataFrames, asegurando que cumplan con las columnas esperadas.
+- test_etl_jobs.py: Valida la creación de un DataFrame con Spark y su estructura mínima como parte de una transformación.
+- conftest.py: Define fixtures reutilizables con datos de prueba.
+  
+Estas pruebas no son requeridas en el despliegue por CloudFormation, pero aportan valor técnico y demuestran buenas prácticas de calidad y validación del código.
+
+> Nota: Se eliminó test_utils.py por no aportar validación funcional real.
 
 ## 📷 Validación, Evidencias y Mejoras Pendientes
-- El pipeline fue probado completamente en AWS.
-- La infraestructura fue desplegada exitosamente con CloudFormation.
-- Se validaron Glue Jobs, consultas Athena y Redshift Spectrum.
-- Se adjuntan capturas de evidencia en el documento entregado.
 
-**Mejoras pendientes**:
-- Control de duplicados en zona raw/processed.
-- Validaciones más robustas.
-- Automatizar pruebas unitarias.
-- Integración CI/CD entre GitHub y AWS (entorno preparado, aún no conectado).
+- Todo el pipeline fue probado completamente en AWS.  
+- La infraestructura fue desplegada exitosamente usando plantillas de **AWS CloudFormation**, incluyendo módulos para S3, Glue, Lake Formation y Redshift.
+- Se validó que cada componente se ejecutara correctamente:
+  - Glue Jobs completaron con éxito.
+  - Athena ejecutó consultas sobre particiones correctamente.
+  - Redshift Spectrum pudo consultar datos desde la zona curated.
+- Se adjuntan imágenes de las ejecuciones en AWS Console en el documento entregado.
+- 
+- **Mejoras pendientes**:
+  - Agregar control de duplicados en las zonas raw/processed.
+  - Optimizar validaciones de calidad de datos.
+  - Automatizar ejecución de pruebas unitarias para los ETL scripts.
+  - Se inició el proceso para conectar el repositorio de **GitHub con AWS** con el objetivo de automatizar despliegues directamente desde el código fuente.  
+  Aunque la integración no se completó, se documentó la intención y se dejó preparado el entorno para su futura implementación como una mejora de CI/CD.
 
   ## 🧪 Carpeta `experimental/` (antes `src/`)
 
