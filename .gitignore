@@ -1,0 +1,65 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+*.egg
+dist/
+build/
+develop-eggs/
+downloads/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+.installed.cfg
+
+# Virtual Environments
+.env
+.venv/
+ENV/
+env/
+venv/
+.env.local
+.env.*.local
+
+# AWS
+.aws/
+*.pem
+*.ppk
+
+# IDEs
+.idea/
+.vscode/
+*.swo
+*.swp
+.DS_Store
+
+# Logs and Temp Files
+logs/
+temp/
+*.log
+
+# CloudFormation
+*.template.json
+*.template.yaml
+*.stack.yaml
+*.stack.json
+
+# Pytest
+.pytest_cache/
+
+# Data
+data/raw/*
+!data/raw/providers/sample_providers.csv
+!data/raw/clients/sample_clients.csv
+!data/raw/transactions/sample_transactions.csv
+*.parquet
+
+# Init files
+!**/__init__.py

@@ -1,0 +1,61 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Configuración completa de Lake Formation para Data Lake en S3
+
+Parameters:
+  DataLakeAdmin:
+    Type: String
+    Description: "ARN del rol o usuario de IAM que actuará como administrador del Data Lake. Ej.: arn:aws:iam::123456789012:role/MyLakeFormationAdminRole"
+    Default: arn:aws:iam::045775973797:role/aws-service-role/lakeformation.amazonaws.com/AWSServiceRoleForLakeFormationDataAccess
+
+  DatabaseName:
+    Type: String
+    Default: energy-trading_dev_db
+
+  RawBucket:
+    Type: String
+    Description: Nombre del bucket S3 para la capa raw del Data Lake
+    Default: energy-trading-datalake-dev-raw
+
+Resources:
+
+  LakeFormationSettings:
+    Type: AWS::LakeFormation::DataLakeSettings
+    Properties:
+      Admins:
+        - DataLakePrincipalIdentifier: !Ref DataLakeAdmin
+
+  LakeS3Location:
+    Type: AWS::LakeFormation::Resource
+    Properties:
+      ResourceArn: !Sub "arn:aws:s3:::${RawBucket}" 
+      UseServiceLinkedRole: true
+
+  LakeS3LocationPermissions:
+      Type: AWS::LakeFormation::Permissions
+      Properties:
+        DataLakePrincipal:
+          DataLakePrincipalIdentifier: !Ref DataLakeAdmin
+        Resource:
+          DataLocationResource:
+            CatalogId: !Ref AWS::AccountId
+            S3Resource: !Sub "arn:aws:s3:::${RawBucket}"
+        Permissions:
+          - DATA_LOCATION_ACCESS
+
+  LakeFormationDatabasePermissions:
+    Type: AWS::LakeFormation::Permissions
+    Properties:
+      DataLakePrincipal:
+        DataLakePrincipalIdentifier: !Ref DataLakeAdmin
+      Resource:
+        DatabaseResource:
+          CatalogId: !Ref AWS::AccountId # Asegúrate de que esta línea esté presente y no comentada
+          Name: !Ref DatabaseName
+      Permissions:
+        - CREATE_TABLE
+        - ALTER
+        - DROP
+        - DESCRIBE
+        # - ALL # Alternativa para control total
+
+

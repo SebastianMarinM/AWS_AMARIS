@@ -1,0 +1,84 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template para Redshift ETL Pipeline con Glue Integration
+
+Parameters:
+  RedshiftClusterIdentifier:
+    Type: String
+    Default: energy-redshift-cluster
+  DatabaseName:
+    Type: String
+    Default: energy_trading
+  MasterUsername:
+    Type: String
+    Default: masteruser
+  MasterUserPassword:
+    Type: String
+    NoEcho: true
+  NodeType:
+    Type: String
+    Default: dc2.large
+
+Resources:
+
+  RedshiftSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Redshift
+      VpcId: vpc-087ffe98f278b0b90
+
+  RedshiftSubnetGroup:
+    Type: AWS::Redshift::ClusterSubnetGroup
+    Properties:
+      Description: Subnet group for Redshift
+      SubnetIds:
+        - subnet-060bfabb01c5ccd9e
+        - subnet-08313700865fbaede
+
+  RedshiftCluster:
+    Type: AWS::Redshift::Cluster
+    Properties:
+      ClusterIdentifier: !Ref RedshiftClusterIdentifier
+      DBName: !Ref DatabaseName
+      MasterUsername: !Ref MasterUsername
+      MasterUserPassword: !Ref MasterUserPassword
+      NodeType: !Ref NodeType
+      ClusterType: multi-node       # <-- ESTA LÍNEA ES OBLIGATORIA
+      NumberOfNodes: 2              # Solo si usas multi-node
+      PubliclyAccessible: false
+      IamRoles:
+        - arn:aws:iam::045775973797:role/glue-role-dev
+      ClusterSubnetGroupName: !Ref RedshiftSubnetGroup
+      VpcSecurityGroupIds:
+        - !Ref RedshiftSecurityGroup
+
+
+  GlueToRedshiftConnection:
+    Type: AWS::Glue::Connection
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      ConnectionInput:
+        Name: redshift-connection
+        ConnectionType: JDBC
+        ConnectionProperties:
+          JDBC_CONNECTION_URL: !Sub "jdbc:redshift://${RedshiftCluster.Endpoint.Address}:${RedshiftCluster.Endpoint.Port}/${DatabaseName}"
+          USERNAME: !Ref MasterUsername
+          PASSWORD: !Ref MasterUserPassword
+        PhysicalConnectionRequirements:
+          SubnetId: subnet-060bfabb01c5ccd9e
+          SecurityGroupIdList:
+            - sg-0900e325c8ae3491a
+
+
+Outputs:
+
+  RedshiftClusterEndpoint:
+    Description: Endpoint del clúster Redshift
+    Value: !GetAtt RedshiftCluster.Endpoint.Address
+
+  RedshiftClusterId:
+    Description: ID del clúster Redshift
+    Value: !Ref RedshiftCluster
+
+  RedshiftGlueConnection:
+    Description: Glue JDBC Connection to Redshift
+    Value: !Ref GlueToRedshiftConnection

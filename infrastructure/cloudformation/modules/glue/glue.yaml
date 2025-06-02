@@ -1,0 +1,209 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Plantilla CloudFormation extendida para Glue ETL (jobs, crawlers, connection)
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: energy-trading
+  Environment:
+    Type: String
+    Default: dev
+  RawBucket:
+    Type: String
+    Default: energy-trading-datalake-dev-raw
+  ProcessedBucket:
+    Type: String
+    Default: energy-trading-datalake-dev-processed
+  CuratedBucket:
+    Type: String
+    Default: energy-trading-datalake-dev-curated
+
+Resources:
+
+  ### GLUE DATABASE ###
+  GlueDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: !Sub "${ProjectName}_${Environment}_db"
+
+  ### GLUE ROLE ###
+  GlueServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "glue-role-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: glue.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+      Policies:
+        - PolicyName: GlueS3Access
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [s3:PutObject, s3:GetObject, s3:ListBucket]
+                Resource:
+                  - !Sub "arn:aws:s3:::${RawBucket}/*"
+                  - !Sub "arn:aws:s3:::${ProcessedBucket}/*"
+                  - !Sub "arn:aws:s3:::${CuratedBucket}/*"
+
+  ### RAW → PROCESSED JOBS ###
+  RawClientsJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Sub "raw-clients-${Environment}"
+      Role: !GetAtt GlueServiceRole.Arn
+      Command:
+        Name: glueetl
+        ScriptLocation: !Sub "s3://${ProcessedBucket}/scripts/clients.py"
+      DefaultArguments:
+        --TempDir: !Sub "s3://${ProcessedBucket}/temp/"
+        --database: !Ref GlueDatabase
+      GlueVersion: "3.0"
+      NumberOfWorkers: 2
+      WorkerType: G.1X
+
+  RawProvidersJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Sub "raw-providers-${Environment}"
+      Role: !GetAtt GlueServiceRole.Arn
+      Command:
+        Name: glueetl
+        ScriptLocation: !Sub "s3://${ProcessedBucket}/scripts/providers.py"
+      DefaultArguments:
+        --TempDir: !Sub "s3://${ProcessedBucket}/temp/"
+        --database: !Ref GlueDatabase
+      GlueVersion: "3.0"
+      NumberOfWorkers: 2
+      WorkerType: G.1X
+
+  RawTransactionsJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Sub "raw-transactions-${Environment}"
+      Role: !GetAtt GlueServiceRole.Arn
+      Command:
+        Name: glueetl
+        ScriptLocation: !Sub "s3://${ProcessedBucket}/scripts/transactions.py"
+      DefaultArguments:
+        --TempDir: !Sub "s3://${ProcessedBucket}/temp/"
+        --database: !Ref GlueDatabase
+      GlueVersion: "3.0"
+      NumberOfWorkers: 2
+      WorkerType: G.1X
+
+  ### PROCESSED → CURATED JOBS ###
+  ProcessedToCuratedClientsJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Sub "processed-to-curated-clients-${Environment}"
+      Role: !GetAtt GlueServiceRole.Arn
+      Command:
+        Name: glueetl
+        ScriptLocation: !Sub "s3://${ProcessedBucket}/scripts/clients_to_curated.py"
+      DefaultArguments:
+        --TempDir: !Sub "s3://${ProcessedBucket}/temp/"
+        --database: !Ref GlueDatabase
+      GlueVersion: "3.0"
+      NumberOfWorkers: 2
+      WorkerType: G.1X
+
+  ProcessedToCuratedProvidersJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Sub "processed-to-curated-providers-${Environment}"
+      Role: !GetAtt GlueServiceRole.Arn
+      Command:
+        Name: glueetl
+        ScriptLocation: !Sub "s3://${ProcessedBucket}/scripts/providers_to_curated.py"
+      DefaultArguments:
+        --TempDir: !Sub "s3://${ProcessedBucket}/temp/"
+        --database: !Ref GlueDatabase
+      GlueVersion: "3.0"
+      NumberOfWorkers: 2
+      WorkerType: G.1X
+
+  ProcessedToCuratedTransactionsJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Sub "processed-to-curated-transactions-${Environment}"
+      Role: !GetAtt GlueServiceRole.Arn
+      Command:
+        Name: glueetl
+        ScriptLocation: !Sub "s3://${ProcessedBucket}/scripts/transactions_to_curated.py"
+      DefaultArguments:
+        --TempDir: !Sub "s3://${ProcessedBucket}/temp/"
+        --database: !Ref GlueDatabase
+      GlueVersion: "3.0"
+      NumberOfWorkers: 2
+      WorkerType: G.1X
+
+  ### GLUE CRAWLERS ###
+  RawDataCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Name: !Sub "raw-data-crawler-${Environment}"
+      Role: !GetAtt GlueServiceRole.Arn
+      DatabaseName: !Ref GlueDatabase
+      Targets:
+        S3Targets:
+          - Path: !Sub "s3://${RawBucket}/"
+      TablePrefix: raw_
+      Schedule:
+        ScheduleExpression: "cron(0 0 * * ? *)"
+
+  ProcessedDataCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Name: !Sub "processed-data-crawler-${Environment}"
+      Role: !GetAtt GlueServiceRole.Arn
+      DatabaseName: !Ref GlueDatabase
+      Targets:
+        S3Targets:
+          - Path: !Sub "s3://${ProcessedBucket}/"
+      TablePrefix: processed_
+      Schedule:
+        ScheduleExpression: "cron(30 0 * * ? *)"
+
+  ### GLUE CONNECTION A REDSHIFT (opcional) ###
+  GlueConnectionRedshift:
+    Type: AWS::Glue::Connection
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      ConnectionInput:
+        Name: !Sub "${ProjectName}-${Environment}-redshift-conn"
+        ConnectionType: JDBC
+        ConnectionProperties:
+          JDBC_CONNECTION_URL: "<REEMPLAZAR>"
+          USERNAME: "<REEMPLAZAR>"
+          PASSWORD: "<REEMPLAZAR>"
+        PhysicalConnectionRequirements:
+          AvailabilityZone: !Select [0, !GetAZs '']
+          SubnetId: "<REEMPLAZAR>"
+          SecurityGroupIdList:
+            - "<REEMPLAZAR>"
+
+Outputs:
+  GlueDatabaseName: { Value: !Ref GlueDatabase }
+  GlueRoleArn: { Value: !GetAtt GlueServiceRole.Arn }
+  RawCrawlerName: { Value: !Ref RawDataCrawler }
+  ProcessedCrawlerName: { Value: !Ref ProcessedDataCrawler }
+  Jobs:
+    Value: !Join [", ", [
+      !Ref RawClientsJob,
+      !Ref RawProvidersJob,
+      !Ref RawTransactionsJob,
+      !Ref ProcessedToCuratedClientsJob,
+      !Ref ProcessedToCuratedProvidersJob,
+      !Ref ProcessedToCuratedTransactionsJob
+    ]]
+  RedshiftConnection: { Value: !Ref GlueConnectionRedshift }
+

@@ -1,0 +1,170 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template completo para Data Lake con Glue, Athena, Lake Formation y Redshift
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: energy-trading
+  Environment:
+    Type: String
+    Default: dev
+  RedshiftUsername:
+    Type: String
+  RedshiftPassword:
+    Type: String
+    NoEcho: true
+  RedshiftSubnetId:
+    Type: AWS::EC2::Subnet::Id
+  RedshiftSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+
+Resources:
+
+  RawBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${ProjectName}-datalake-${Environment}-raw-v2"
+      VersioningConfiguration: { Status: Enabled }
+
+  ProcessedBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${ProjectName}-datalake-${Environment}-processed-v2"
+      VersioningConfiguration: { Status: Enabled }
+
+  CuratedBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${ProjectName}-datalake-${Environment}-curated-v2"
+      VersioningConfiguration: { Status: Enabled }
+
+  AthenaResultsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${ProjectName}-athena-results-${Environment}-v2"
+      VersioningConfiguration: { Status: Enabled }
+
+  GlueServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "glue-role-${Environment}-v2"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: glue.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+      Policies:
+        - PolicyName: GlueS3Access
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject, s3:ListBucket]
+                Resource:
+                  - !Sub "arn:aws:s3:::${ProjectName}-datalake-${Environment}-raw-v2/*"
+                  - !Sub "arn:aws:s3:::${ProjectName}-datalake-${Environment}-processed-v2/*"
+                  - !Sub "arn:aws:s3:::${ProjectName}-datalake-${Environment}-curated-v2/*"
+                  - !Sub "arn:aws:s3:::${ProjectName}-athena-results-${Environment}-v2/*"
+
+  GlueDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: !Sub "${ProjectName}_${Environment}_db_v2"
+
+  GlueCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Name: !Sub "${ProjectName}-${Environment}-raw-crawler-v2"
+      Role: !GetAtt GlueServiceRole.Arn
+      DatabaseName: !Ref GlueDatabase
+      Targets:
+        S3Targets:
+          - Path: !Sub "s3://${ProjectName}-datalake-${Environment}-raw-v2/"
+      Schedule:
+        ScheduleExpression: "cron(0 12 * * ? *)"
+      SchemaChangePolicy:
+        UpdateBehavior: UPDATE_IN_DATABASE
+        DeleteBehavior: LOG
+
+  GlueJobRawToProcessed:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Sub "${ProjectName}-${Environment}-raw-to-processed-v2"
+      Role: !GetAtt GlueServiceRole.Arn
+      Command:
+        Name: glueetl
+        ScriptLocation: !Sub "s3://${ProjectName}-datalake-${Environment}-scripts/raw_to_processed.py"
+        PythonVersion: "3"
+      GlueVersion: "3.0"
+      DefaultArguments:
+        "--job-language": "python"
+        "--TempDir": !Sub "s3://${ProjectName}-datalake-${Environment}-temp-v2/"
+        "--database": !Ref GlueDatabase
+      MaxRetries: 1
+      Timeout: 10
+      NumberOfWorkers: 2
+      WorkerType: Standard
+
+  GlueJobProcessedToCurated:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Sub "${ProjectName}-${Environment}-processed-to-curated-v2"
+      Role: !GetAtt GlueServiceRole.Arn
+      Command:
+        Name: glueetl
+        ScriptLocation: !Sub "s3://${ProjectName}-datalake-${Environment}-scripts/processed_to_curated.py"
+        PythonVersion: "3"
+      GlueVersion: "3.0"
+      DefaultArguments:
+        "--job-language": "python"
+        "--TempDir": !Sub "s3://${ProjectName}-datalake-${Environment}-temp-v2/"
+        "--database": !Ref GlueDatabase
+      MaxRetries: 1
+      Timeout: 10
+      NumberOfWorkers: 2
+      WorkerType: Standard
+
+  AthenaWorkGroup:
+    Type: AWS::Athena::WorkGroup
+    Properties:
+      Name: !Sub "${ProjectName}-${Environment}-workgroup-v2"
+      State: ENABLED
+      WorkGroupConfiguration:
+        ResultConfiguration:
+          OutputLocation: !Sub "s3://${ProjectName}-athena-results-${Environment}-v2/"
+
+  GlueConnectionRedshift:
+    Type: AWS::Glue::Connection
+    Properties:
+      ConnectionInput:
+        Name: !Sub "${ProjectName}-${Environment}-redshift-conn-v2"
+        ConnectionType: JDBC
+        ConnectionProperties:
+          JDBC_CONNECTION_URL: jdbc:redshift://energy-redshift-cluster.ckzzvympgj8r.us-east-1.redshift.amazonaws.com:5439/energy_trading
+          USERNAME: !Ref RedshiftUsername
+          PASSWORD: !Ref RedshiftPassword
+        PhysicalConnectionRequirements:
+          AvailabilityZone: !Select [0, !GetAZs '']
+          SubnetId: !Ref RedshiftSubnetId
+          SecurityGroupIdList:
+            - !Ref RedshiftSecurityGroupId
+      CatalogId: !Ref AWS::AccountId
+
+Outputs:
+  RawBucket: { Value: !Ref RawBucket }
+  ProcessedBucket: { Value: !Ref ProcessedBucket }
+  CuratedBucket: { Value: !Ref CuratedBucket }
+  AthenaOutputBucket: { Value: !Ref AthenaResultsBucket }
+  GlueDatabaseName: { Value: !Ref GlueDatabase }
+  GlueCrawlerName: { Value: !Ref GlueCrawler }
+  GlueRoleArn: { Value: !GetAtt GlueServiceRole.Arn }
+  AthenaWorkGroup: { Value: !Ref AthenaWorkGroup }
+  GlueJobRawToProcessed: { Value: !Ref GlueJobRawToProcessed }
+  GlueJobProcessedToCurated: { Value: !Ref GlueJobProcessedToCurated }
+  GlueRedshiftConnection: { Value: !Ref GlueConnectionRedshift }
