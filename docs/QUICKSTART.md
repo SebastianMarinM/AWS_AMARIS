@@ -14,7 +14,7 @@ pip install -r requirements.txt
 
 ## Configuración Inicial
 
-### Parámetros (ejemplo para línea de comandos)
+### Parámetros
 ```bash
 export ENVIRONMENT="dev"
 export PROJECT_NAME="energy-trading"
@@ -24,17 +24,25 @@ export ATHENA_OUTPUT_BUCKET="energy-trading-athena-results-dev"
 
 ## Despliegue con CloudFormation
 ```bash
-cd infrastructure/cloudformation
+cd infrastructure/
 
-aws cloudformation deploy   --template-file main_stack.yaml   --stack-name energy-data-lake-stack   --capabilities CAPABILITY_NAMED_IAM   --parameter-overrides     Environment=$ENVIRONMENT     ProjectName=$PROJECT_NAME     DataLakeBucketName=$DATA_LAKE_BUCKET_NAME     AthenaOutputBucket=$ATHENA_OUTPUT_BUCKET
+aws cloudformation deploy \
+  --template-file cloudformation_stack.yaml \
+  --stack-name energy-data-lake-stack \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --parameter-overrides \
+    Environment=$ENVIRONMENT \
+    ProjectName=$PROJECT_NAME \
+    DataLakeBucketName=$DATA_LAKE_BUCKET_NAME \
+    AthenaOutputBucket=$ATHENA_OUTPUT_BUCKET
 ```
 
-## Carga de Datos (ejemplo manual)
+## Carga de Datos
 ```bash
 aws s3 cp data/raw/clients/sample_clients.csv s3://energy-trading-datalake-dev/raw/20250529_clients/
 ```
 
-## Ejecución de Crawlers y Jobs (deben estar creados por CloudFormation)
+## Ejecución de Crawlers y Jobs
 ```bash
 aws glue start-crawler --name energy-trading-raw-crawler
 aws glue start-job-run --job-name raw-to-processed
@@ -45,7 +53,7 @@ aws glue start-job-run --job-name raw-to-processed
 SELECT * FROM processed.clients LIMIT 10;
 ```
 
-## Consulta con Boto3 desde Python
+## Consulta con Python y Boto3
 ```python
 import boto3
 
