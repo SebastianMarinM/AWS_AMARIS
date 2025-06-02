@@ -1,80 +1,136 @@
 
-# Energy Trading Data Lake Project
+# ⚡ Proyecto Data Lake para Comercialización de Energía
 
-## Overview
-This project implements a data lake solution for an energy trading company using AWS services. It processes data from providers, customers, and transactions, building an ETL pipeline with governance and analytics.
+## 📌 Descripción General
+Este proyecto implementa una arquitectura completa de Data Lake para una empresa comercializadora de energía utilizando AWS. Se ingieren archivos CSV desde sistemas operativos (clientes, proveedores, transacciones), se procesan con AWS Glue, se almacenan en S3 en múltiples zonas, se consultan mediante Athena y Redshift Spectrum, y se aplica gobernanza de datos con Lake Formation.
 
-## Architecture
-The solution follows a multi-layer data lake design:
-- **Landing Zone**: Raw CSV exports from source systems
-- **Raw Zone**: Validated and versioned files in S3
-- **Transform Zone**: Data transformed and stored in Parquet format
-- **Curated Zone**: Optimized, clean datasets for analytics
-- **Analytics Zone**: Athena queries and reports
-- **Redshift Zone**: Optional destination for advanced analytics from curated data
+## 📐 Arquitectura
+El pipeline sigue una arquitectura en capas:
 
-## Technologies Used
-- **Amazon S3** – Scalable object storage for data lake
-- **AWS Glue** – ETL jobs, schema detection (crawlers), and cataloging
-- **AWS Lake Formation** – Governance and fine-grained access control
-- **Amazon Athena** – Serverless SQL querying over S3 data
-- **Amazon Redshift** – Optional data warehouse for advanced analytics
-- **AWS CloudFormation** – Infrastructure as Code (IaC)
-- **Python** – Scripts for ETL orchestration and data handling
+- **Zona Raw**: Archivos CSV originales ingeridos desde los sistemas fuente, particionados por fecha de carga.
+- **Zona Procesada**: Datos convertidos a formato Parquet con validación básica y particionados por año/mes/día.
+- **Zona Curada**: Conjuntos de datos limpios y deduplicados optimizados para analítica.
+- **Acceso Analítico**:
+  - **Amazon Athena**: Consultas SQL directas sobre datos en S3.
+  - **Amazon Redshift Spectrum**: Consultas externas sobre datos curados vía Glue Catalog.
+  
+## 🛠 Tecnologías Utilizadas
+- `Amazon S3`: Almacenamiento del Data Lake
+- `AWS Glue`: ETL (Jobs + Crawlers + Catálogo)
+- `Amazon Athena`: Motor de consultas serverless sobre S3
+- `Amazon Redshift`: Data Warehouse + Spectrum
+- `AWS Lake Formation`: Gobernanza de datos y permisos
+- `AWS CloudFormation`: Infraestructura como Código (IaC)
+- `Python (boto3, pandas)`: Orquestación y scripts analíticos
 
-## Prerequisites
-- AWS CLI configured with credentials
-- Python >= 3.8
-- AWS account with permissions for S3, Glue, Athena, and Lake Formation
-- IAM roles and policies already defined or created via CloudFormation templates
-
-## Project Structure
+## 📁 Estructura del Proyecto
 ```
+AWS_AMARIS/
 ├── infrastructure/
-│ └── cloudformation/
-│ ├── s3.yaml
-│ ├── lakeformation.yaml
-│ ├── redshift.yaml
-│ └── glue_jobs/
-├── src/
-│ ├── etl/
-│ ├── utils/
-│ ├── sql/
-│ └── scripts/
+│   ├── modules/
+│   │   ├── s3.yaml
+│   │   ├── glue.yaml
+│   │   ├── lakeformation.yaml
+│   │   └── redshift.yaml
+│   └── environments/
+│       └── dev/
+│           └── cloudformation_stack.yaml
+├── scripts/
+│   └── python/
+│       ├── raw_to_processed.py
+│       ├── processed_to_curated.py
+│       └── athena_queries.py
 ├── data/
-│ ├── raw/
-│ ├── processed/
-│ └── curated/
-├── tests/
-├── docs/
+│   ├── raw/
+│   ├── processed/
+│   └── curated/
 └── README.md
+
 ```
 
-## Quick Start
+## 🚀 Guía de Despliegue
+
+### Paso 1: Desplegar Infraestructura
 ```bash
-# 1. Deploy infrastructure with CloudFormation
-aws cloudformation deploy --template-file infrastructure/cloudformation/s3.yaml --stack-name datalake-s3
-aws cloudformation deploy --template-file infrastructure/cloudformation/lakeformation.yaml --stack-name lake-permissions
-aws cloudformation deploy --template-file infrastructure/cloudformation/redshift.yaml --stack-name redshift-cluster
+# Buckets S3
+aws cloudformation deploy --template-file infrastructure/cloudformation/modules/s3.yaml --stack-name datalake-s3
 
-# 2. Generate sample data
-python src/scripts/generate_sample_data.py
+# Lake Formation y permisos
+aws cloudformation deploy --template-file infrastructure/cloudformation/modules/lakeformation.yaml --stack-name datalake-lakeformation
 
-# 3. Upload to S3
-python src/scripts/upload_to_s3.py
+# Recursos de Glue (jobs, crawlers, roles)
+aws cloudformation deploy --template-file infrastructure/cloudformation/modules/glue.yaml --stack-name datalake-glue
 
-# 4. Run Glue ETL jobs (trigger via AWS Console or boto3 script)
+# Clúster Redshift
+aws cloudformation deploy --template-file infrastructure/cloudformation/modules/redshift.yaml --stack-name datalake-redshift
 ```
 
-## Redshift Integration
-- The datasets from the **Curated Zone** (e.g., `daily_energy_consumption`, `client_analytics`) are loaded into Amazon Redshift for advanced BI and reporting.
-- Glue Job `curated-to-redshift` (to be implemented) loads the Parquet files from S3 into Redshift tables using the `COPY` command.
-- The `GlueToRedshiftConnection` defined in `cloudformation/redshift.yaml` provides JDBC access, and appropriate IAM roles ensure secure communication.
+### Paso 2: Ejecutar ETL Jobs
+Puedes ejecutarlos desde la consola de AWS o mediante trigger:
+- `raw_to_processed.py`: Convierte CSV a Parquet y particiona por fecha.
+- `processed_to_curated.py`: Limpia, deduplica y escribe datos curados.
 
-## Security and Monitoring
-- Encryption at rest (S3 default encryption)
-- Fine-grained access via Lake Formation
-- CloudWatch monitoring for Glue jobs and Athena queries
+### Paso 3: Actualizar Catálogo de Glue
+```bash
+# Ejecutar crawlers o configurar triggers luego de cada ETL
+```
 
-## License
-MIT License
+### Paso 4: Consultar con Athena
+Usa el script `athena_queries.py` para:
+- Agregar energía vendida por tipo
+- Obtener los principales clientes por consumo
+- Evaluar desempeño de proveedores
+
+### Paso 5: Redshift Spectrum 
+```sql
+CREATE EXTERNAL SCHEMA curated
+FROM data catalog
+DATABASE 'energy_trading_curated_db'
+IAM_ROLE 'arn:aws:iam::ACCOUNT_ID:role/RedshiftSpectrumRole'
+CREATE EXTERNAL DATABASE IF NOT EXISTS;
+
+-- Consulta de ejemplo
+SELECT * FROM curated.clients LIMIT 10;
+```
+
+## ✅ Funcionalidades Implementadas
+- ✅ Estructura en S3 con múltiples zonas y datos particionados
+- ✅ Jobs de Glue con conversión de formato y particionado
+- ✅ Crawlers y Catálogo de Glue por zona (`raw`, `processed`, `curated`)
+- ✅ Integración con Athena vía Python (`boto3`)
+- ✅ Integración con Redshift Spectrum
+- ✅ Infraestructura como código con CloudFormation modular
+- ✅ Roles IAM y políticas de acceso refinado a S3
+
+## 🔒 Seguridad y Gobernanza
+- Encriptación en S3 (por defecto)
+- Control de acceso granular con Lake Formation
+- Roles IAM para Glue, Redshift y Athena
+- Particionado de datos para reducir costos de consulta
+
+## 🧪 Pruebas
+Validaciones aplicadas en scripts de transformación:
+- Eliminación de registros nulos
+- Deduplicación por campos clave
+- Creación y verificación de particiones en S3
+
+## 📷 Validación, Evidencias y Mejoras Pendientes
+
+- Todo el pipeline fue probado completamente en AWS.  
+- La infraestructura fue desplegada exitosamente usando plantillas de **AWS CloudFormation**, incluyendo módulos para S3, Glue, Lake Formation y Redshift.
+- Se validó que cada componente se ejecutara correctamente:
+  - Glue Jobs completaron con éxito.
+  - Athena ejecutó consultas sobre particiones correctamente.
+  - Redshift Spectrum pudo consultar datos desde la zona `curated`.
+- Se adjuntan imágenes de las ejecuciones en AWS Console en el documento entregado.
+- 
+- **Mejoras pendientes**:
+  - Agregar control de duplicados en las zonas raw/processed.
+  - Optimizar validaciones de calidad de datos.
+  - Automatizar ejecución de pruebas unitarias para los ETL scripts.
+  - Se inició el proceso para conectar el repositorio de **GitHub con AWS** con el objetivo de automatizar despliegues directamente desde el código fuente.  
+  Aunque la integración no se completó, se documentó la intención y se dejó preparado el entorno para su futura implementación como una mejora de CI/CD.
+
+## 📄 Licencia
+Licencia MIT
+
