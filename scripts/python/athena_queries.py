@@ -49,7 +49,8 @@ class AthenaClient:
 def main():
     athena_client = AthenaClient(
         database='energy_processed',
-        s3_output_location='s3://your-athena-output-bucket/results/'
+        s3_output_location='s3://energy-trading-athena-results/output/'
+
     )
 
     queries = {
